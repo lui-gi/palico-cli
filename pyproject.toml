@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "palico-cli"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai>=0.8",
+    "rich>=13",
+]
+
+[project.scripts]
+palico = "palico.main:run"
