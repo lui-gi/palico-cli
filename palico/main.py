@@ -1,3 +1,4 @@
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -7,12 +8,7 @@ from palico import db
 CONFIG_DIR = Path.home() / ".palico"
 CONFIG_PATH = CONFIG_DIR / "config.json"
 
-# These are imported lazily after T2/T3 are done; stubs let the file parse now.
-try:
-    from palico import display, gemini
-    _FULL = True
-except ImportError:
-    _FULL = False
+from palico import display, gemini
 
 
 def _load_config() -> dict:
@@ -26,9 +22,14 @@ def _save_config(cfg: dict) -> None:
     CONFIG_PATH.write_text(json.dumps(cfg, indent=2))
 
 
-def _ensure_api_key(cfg: dict) -> str:
-    if "gemini_api_key" in cfg:
-        return cfg["gemini_api_key"]
+def _ensure_api_key(cfg: dict, override: str | None = None) -> str:
+    if override:
+        cfg["gemini_api_key"] = override
+        _save_config(cfg)
+        return override
+    key = cfg.get("gemini_api_key", "").strip()
+    if key:
+        return key
     key = display.prompt_api_key()
     cfg["gemini_api_key"] = key
     _save_config(cfg)
@@ -57,9 +58,13 @@ def _focus_project(raw: str, projects: list[dict]) -> dict | None:
 
 
 def run() -> None:
+    parser = argparse.ArgumentParser(prog="palico")
+    parser.add_argument("--api", metavar="KEY", help="Gemini API key (saved to config)")
+    args = parser.parse_args()
+
     db.init()
     cfg = _load_config()
-    api_key = _ensure_api_key(cfg)
+    api_key = _ensure_api_key(cfg, override=args.api)
     gemini.init(api_key)
 
     projects = db.get_all_projects()
