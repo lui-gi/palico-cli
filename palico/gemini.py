@@ -47,7 +47,7 @@ Resolve relative dates against today. Return only valid JSON."""
 
     try:
         response = _client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-3.1-flash-lite-preview",
             contents=user_message,
             config=types.GenerateContentConfig(
                 system_instruction=system_prompt,
@@ -77,7 +77,7 @@ Give exactly 1-2 short, actionable suggestions. Return as a JSON array of string
 
     try:
         response = _client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-3.1-flash-lite-preview",
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
