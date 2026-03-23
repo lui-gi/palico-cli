@@ -61,8 +61,8 @@ Resolve relative dates against today. Return only valid JSON."""
             "data": result.get("data", {}),
             "reply": result.get("reply", ""),
         }
-    except Exception:
-        return {"action": "none", "data": {}, "reply": "Sorry, I couldn't reach the AI. Try again."}
+    except Exception as e:
+        return {"action": "none", "data": {}, "reply": f"Sorry, I couldn't reach the AI ({e}). Try again."}
 
 
 def get_suggestions(project: dict, notes: list[dict]) -> list[str]:

@@ -93,11 +93,11 @@ def run() -> None:
                 result = gemini.parse_intent(raw, None)
                 reply = result.get("reply", "")
                 focused = _dispatch(result["action"], result.get("data", {}), None)
-                if reply:
-                    display.print_reply(reply)
                 if focused is None:
-                    display.print_reply("I couldn't find that project. Try again or say 'start a new project called ...'")
+                    display.print_reply(reply if reply else "I couldn't find that project. Try again or say 'start a new project called ...'")
                     continue
+                elif reply:
+                    display.print_reply(reply)
             # Show project panel with suggestions.
             notes = db.get_notes(focused["id"])
             suggestions = gemini.get_suggestions(focused, notes)
