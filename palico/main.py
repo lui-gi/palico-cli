@@ -1,39 +1,22 @@
 import argparse
-import json
 import sys
-from pathlib import Path
 
 from palico import db
-
-CONFIG_DIR = Path.home() / ".palico"
-CONFIG_PATH = CONFIG_DIR / "config.json"
 
 from palico import display, gemini
 
 
-def _load_config() -> dict:
-    if CONFIG_PATH.exists():
-        return json.loads(CONFIG_PATH.read_text())
-    return {}
-
-
-def _save_config(cfg: dict) -> None:
-    CONFIG_DIR.mkdir(exist_ok=True)
-    CONFIG_PATH.write_text(json.dumps(cfg, indent=2))
-
-
-def _ensure_api_key(cfg: dict, override: str | None = None) -> str:
+def _ensure_api_key(override: str | None = None) -> str:
     if override:
-        cfg["gemini_api_key"] = override
-        _save_config(cfg)
         return override
-    key = cfg.get("gemini_api_key", "").strip()
-    if key:
-        return key
-    key = display.prompt_api_key()
-    cfg["gemini_api_key"] = key
-    _save_config(cfg)
-    return key
+    try:
+        from palico.secrets import GEMINI_API_KEY
+        if GEMINI_API_KEY and GEMINI_API_KEY != "your-api-key-here":
+            return GEMINI_API_KEY
+    except ImportError:
+        pass
+    print("Error: add your Gemini API key to palico/secrets.py", file=sys.stderr)
+    sys.exit(1)
 
 
 def _dispatch(action: str, data: dict, focused: dict | None) -> dict | None:
@@ -63,8 +46,7 @@ def run() -> None:
     args = parser.parse_args()
 
     db.init()
-    cfg = _load_config()
-    api_key = _ensure_api_key(cfg, override=args.api)
+    api_key = _ensure_api_key(override=args.api)
     gemini.init(api_key)
 
     projects = db.get_all_projects()
