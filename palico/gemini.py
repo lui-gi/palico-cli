@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass, field
 
 from google import genai
 from google.genai import types
@@ -13,6 +14,59 @@ _QUESTION_SYSTEM_PROMPT = (
     "Be precise and technical. Do not pad the answer. Do not use bullet points. "
     "Focus on practical, actionable insight a pentester would actually use."
 )
+
+_CHAT_SYSTEM_PROMPT = (
+    "You are Palico, an elite bug bounty hunter and penetration tester embedded in a terminal CLI. "
+    "You have deep expertise in web app security, network pentesting, OSINT, and vulnerability research. "
+    "You help the user during live engagements: answer questions, suggest attack paths, explain findings, "
+    "and help document results. Be concise and technical. "
+    "You have tools available to save notes to files, clear history, and list sessions — "
+    "use them whenever the user's intent matches, even if they phrase it informally."
+)
+
+_CHAT_TOOLS = [types.Tool(function_declarations=[
+    types.FunctionDeclaration(
+        name="save_to_file",
+        description="Write markdown content to a file, overwriting it if it exists. Use when the user wants to save, write, or dump something to a file.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "filename": types.Schema(type="STRING", description="File path to write to, e.g. notes.md or recon/findings.md"),
+                "content":  types.Schema(type="STRING", description="Full markdown content to write to the file"),
+            },
+            required=["filename", "content"],
+        ),
+    ),
+    types.FunctionDeclaration(
+        name="append_to_file",
+        description="Append markdown content to an existing file (or create it). Use when the user wants to add to or update existing notes.",
+        parameters=types.Schema(
+            type="OBJECT",
+            properties={
+                "filename": types.Schema(type="STRING", description="File path to append to"),
+                "content":  types.Schema(type="STRING", description="Markdown content to append"),
+            },
+            required=["filename", "content"],
+        ),
+    ),
+    types.FunctionDeclaration(
+        name="clear_session",
+        description="Wipe the current conversation history. Use when the user wants to start fresh or forget the conversation.",
+        parameters=types.Schema(type="OBJECT", properties={}),
+    ),
+    types.FunctionDeclaration(
+        name="list_sessions",
+        description="Return the names of all saved chat sessions.",
+        parameters=types.Schema(type="OBJECT", properties={}),
+    ),
+])]
+
+
+@dataclass
+class ChatResult:
+    text: str = ""
+    tool_calls: list[dict] = field(default_factory=list)
+
 
 _CHECKLIST_SYSTEM_PROMPT = (
     "You are an expert penetration tester generating a structured pentesting checklist. "
@@ -49,6 +103,35 @@ def answer_question(question_text: str) -> str:
         return response.text.strip()
     except Exception as e:
         return f"Error reaching Gemini: {e}"
+
+
+def chat_turn(history: list[dict], message: str) -> ChatResult:
+    """Send a message with full conversation history. Returns text and/or tool calls."""
+    contents = []
+    for turn in history:
+        contents.append(
+            types.Content(role=turn["role"], parts=[types.Part(text=turn["text"])])
+        )
+    contents.append(types.Content(role="user", parts=[types.Part(text=message)]))
+    try:
+        response = _client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=_CHAT_SYSTEM_PROMPT,
+                tools=_CHAT_TOOLS,
+            ),
+        )
+        text_parts: list[str] = []
+        tool_calls: list[dict] = []
+        for part in response.candidates[0].content.parts:
+            if part.function_call:
+                tool_calls.append({"name": part.function_call.name, "args": dict(part.function_call.args)})
+            elif part.text:
+                text_parts.append(part.text)
+        return ChatResult(text="".join(text_parts).strip(), tool_calls=tool_calls)
+    except Exception as e:
+        return ChatResult(text=f"Error reaching Gemini: {e}")
 
 
 def generate_checklist(engagement_name: str, target_info: dict) -> list[dict]:

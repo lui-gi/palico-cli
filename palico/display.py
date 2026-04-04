@@ -4,6 +4,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
+from rich.markdown import Markdown
 from rich.text import Text
 
 console = Console()
@@ -76,6 +77,35 @@ def show_checklist(engagement_name: str, checklist: list[dict]) -> None:
         )
         console.print(panel)
     console.print()
+
+
+def show_chat_header(session: str, turn_count: int) -> None:
+    turns = f"{turn_count // 2} exchanges" if turn_count else "new session"
+    console.print()
+    console.print(
+        f"  [bold cyan]palico[/bold cyan] [dim]session=[/dim][yellow]{session}[/yellow]  "
+        f"[dim]{turns}[/dim]  [dim]type /help for commands[/dim]"
+    )
+    console.print()
+
+
+def show_chat_reply(text: str) -> None:
+    # Strip ===BEGIN=== / ===END=== markers from display (content extracted separately)
+    display_text = text
+    if "===BEGIN===" in text and "===END===" in text:
+        before = text[: text.index("===BEGIN===")].strip()
+        after = text[text.index("===END===") + 9 :].strip()
+        display_text = "\n\n".join(filter(None, [before, after]))
+    panel = Panel(
+        Markdown(display_text),
+        border_style="cyan",
+        padding=(0, 1),
+    )
+    console.print(panel)
+
+
+def show_tool_result(tool_name: str, outcome: str) -> None:
+    console.print(f"  [dim]\\[tool][/dim] [yellow]{tool_name}[/yellow] [dim]→[/dim] {outcome}")
 
 
 def show_owasp() -> None:
