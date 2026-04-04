@@ -1,108 +1,96 @@
-from datetime import date, datetime
-from getpass import getpass
+from __future__ import annotations
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
+from rich.table import Table
 from rich.text import Text
 
 console = Console()
 
-_URGENT_DAYS = 3
+_OWASP_TOP_10 = [
+    ("A01:2021", "Broken Access Control",
+     "Moving up from #5; 94% of apps tested had some form of broken access control."),
+    ("A02:2021", "Cryptographic Failures",
+     "Formerly Sensitive Data Exposure. Failures related to cryptography leading to data leaks."),
+    ("A03:2021", "Injection",
+     "SQL, NoSQL, OS, LDAP injection, and XSS. Drops from #1 as controls improve."),
+    ("A04:2021", "Insecure Design",
+     "New category. Missing or ineffective security controls in the design phase."),
+    ("A05:2021", "Security Misconfiguration",
+     "Missing hardening, unnecessary features enabled, default credentials, verbose errors."),
+    ("A06:2021", "Vulnerable & Outdated Components",
+     "Known-vulnerable libraries, frameworks, and software components in use."),
+    ("A07:2021", "Identification & Authentication Failures",
+     "Formerly Broken Auth. Weak session management, credential stuffing, missing MFA."),
+    ("A08:2021", "Software & Data Integrity Failures",
+     "New. Insecure deserialization, untrusted plugins, compromised CI/CD pipelines."),
+    ("A09:2021", "Security Logging & Monitoring Failures",
+     "Insufficient logging and alerting to detect, escalate, or respond to active breaches."),
+    ("A10:2021", "Server-Side Request Forgery (SSRF)",
+     "New. Fetching remote resources without validating user-supplied URL allows internal access."),
+]
 
 
-def _parse_deadline(deadline_str: str | None) -> date | None:
-    if not deadline_str:
-        return None
-    try:
-        return date.fromisoformat(str(deadline_str))
-    except ValueError:
-        return None
-
-
-def _format_deadline(deadline_str: str | None) -> tuple[str, bool]:
-    """Returns (display_string, is_urgent)."""
-    dl = _parse_deadline(deadline_str)
-    if dl is None:
-        return "no deadline", False
-    today = date.today()
-    delta = (dl - today).days
-    label = dl.strftime("due %a %b %-d")
-    urgent = 0 <= delta <= _URGENT_DAYS
-    return label, urgent
-
-
-def show_dashboard(projects: list[dict]) -> None:
-    today_str = date.today().strftime("%A, %B %-d")
+def prompt_target_info(engagement_name: str) -> dict:
     console.print()
-    console.print(f"  Good morning. Today is [bold]{today_str}[/bold].")
+    console.print(f"  [bold cyan]Starting engagement:[/bold cyan] {engagement_name}")
+    console.print("  [dim]Answer the questions below. Press Enter to skip any.[/dim]")
     console.print()
-
-    if not projects:
-        console.print("  [dim]No projects yet. Say 'start a new project called ...' to begin.[/dim]")
-        console.print()
-        return
-
-    console.print("  Your projects:")
-    for i, p in enumerate(projects, 1):
-        deadline_label, urgent = _format_deadline(p.get("deadline"))
-        urgency = " [bold yellow]⚠[/bold yellow]" if urgent else ""
-        name = p["name"]
-        console.print(f"  [bold]{i}.[/bold] {name:<22} {deadline_label}{urgency}")
-
-    console.print()
-    console.print("  Which project do you want to tackle?")
-    console.print()
+    return {
+        "url":         Prompt.ask("  Target URL",                              default="unknown",       console=console),
+        "app_type":    Prompt.ask("  App type (web app/API/mobile/network)",   default="web app",       console=console),
+        "tech_stack":  Prompt.ask("  Tech stack (e.g. React + Node.js)",       default="unknown",       console=console),
+        "auth_type":   Prompt.ask("  Auth type (JWT/sessions/OAuth/none)",     default="unknown",       console=console),
+        "scope_notes": Prompt.ask("  Scope notes",                             default="none provided", console=console),
+    }
 
 
-def show_project(project: dict, notes: list[dict], suggestions: list[str]) -> None:
-    lines: list[Text] = []
-
-    # Notes section
-    lines.append(Text("Notes:", style="bold"))
-    if notes:
-        for n in notes:
-            lines.append(Text(f"  • {n['content']}"))
-    else:
-        lines.append(Text("  (none yet)", style="dim"))
-
-    lines.append(Text(""))
-
-    # Suggestions section
-    lines.append(Text("Suggestions:", style="bold"))
-    if suggestions:
-        for idx, s in enumerate(suggestions, 1):
-            lines.append(Text(f"  {idx}. {s}"))
-    else:
-        lines.append(Text("  (none)", style="dim"))
-
-    content = Text("\n").join(lines)
-
-    deadline_str = project.get("deadline")
-    dl = _parse_deadline(deadline_str)
-    subtitle = dl.strftime("due %a %b %-d") if dl else "no deadline"
-
+def show_answer(question_text: str, answer: str) -> None:
     panel = Panel(
-        content,
-        title=f"[bold]{project['name']}[/bold]",
-        subtitle=f"[dim]{subtitle}[/dim]",
-        border_style="blue",
-        padding=(0, 2),
+        answer,
+        title=f"[bold]{question_text}[/bold]",
+        border_style="cyan",
+        padding=(1, 2),
     )
     console.print()
     console.print(panel)
     console.print()
 
 
-def print_reply(text: str) -> None:
-    console.print(f"  [bold cyan]palico:[/bold cyan] {text}")
+def show_checklist(engagement_name: str, checklist: list[dict]) -> None:
+    console.print()
+    console.rule(f"[bold red]Checklist: {engagement_name}[/bold red]")
+    console.print()
+    for section in checklist:
+        category = section.get("category", "Misc")
+        items = section.get("items", [])
+        body = Text()
+        for item in items:
+            body.append(f"  [ ] {item}\n")
+        panel = Panel(
+            body,
+            title=f"[bold yellow]{category}[/bold yellow]",
+            border_style="dim",
+            padding=(0, 1),
+        )
+        console.print(panel)
+    console.print()
 
 
-def prompt_api_key() -> str:
+def show_owasp() -> None:
+    table = Table(
+        title="OWASP Top 10 — 2021",
+        show_header=True,
+        header_style="bold red",
+        border_style="dim",
+        show_lines=True,
+    )
+    table.add_column("ID", style="bold yellow", width=12)
+    table.add_column("Name", style="bold", width=36)
+    table.add_column("Summary", style="dim", width=54)
+    for code, name, summary in _OWASP_TOP_10:
+        table.add_row(code, name, summary)
     console.print()
-    console.print("  [bold]Welcome to palico![/bold]")
-    console.print("  A Gemini API key is required. Get one at https://aistudio.google.com/apikey")
+    console.print(table)
     console.print()
-    key = Prompt.ask("  Enter your Gemini API key", password=True, console=console)
-    console.print()
-    return key.strip()
